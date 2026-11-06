@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import json
 import warnings
+import re
 import numpy as np
 import pandas as pd
 import joblib
@@ -15,7 +16,7 @@ import joblib
 # Masquer les avertissements de métadonnées de colonnes Scikit-Learn / LightGBM
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# Mapping des noms de produits vers le français
+# Mapping des noms de produits vers le français (strictement les 7 produits du dataset)
 NOMS_PRODUITS = {
     "Cassava meal (gari)": "Gari",
     "Rice (imported)": "Riz importé",
@@ -32,7 +33,9 @@ PRODUITS_INVERSES["Maïs"] = "Maize (white)"
 PRODUITS_INVERSES["Riz"] = "Rice (imported)"
 PRODUITS_INVERSES["Haricot"] = "Beans (white)"
 PRODUITS_INVERSES["Gari"] = "Cassava meal (gari)"
-PRODUITS_INVERSES["Igname"] = "Cassava meal (gari)"
+
+# Départements du Nord selon l'analyse EDA
+DEPARTEMENTS_NORD = {"Alibori", "Atakora", "Borgou", "Donga"}
 
 MOIS_COURTS_FR = {
     1: "janv.", 2: "fév.", 3: "mars", 4: "avr.", 5: "mai", 6: "juin",
@@ -73,9 +76,10 @@ def load_cached_model(model_filename: str, models_dir: str = "models") -> Dict[s
 
 
 def get_available_commodities(df: pd.DataFrame) -> List[Tuple[str, str]]:
-    """Renvoie la liste ordonnée des (nom_affichage, commodity_brute)."""
+    """Renvoie strictement les produits présents dans le jeu de données."""
     brutes = sorted(df["commodity"].dropna().unique().tolist())
     liste = []
+    # Ordre privilégié d'affichage
     ordre_pref = ["Maize (white)", "Rice (imported)", "Beans (white)", "Cassava meal (gari)", "Tomatoes", "Oil (groundnut)", "Onions"]
     for c in ordre_pref:
         if c in brutes:
@@ -90,6 +94,22 @@ def get_available_commodities(df: pd.DataFrame) -> List[Tuple[str, str]]:
 def get_available_markets(df: pd.DataFrame) -> List[Tuple[str, str]]:
     """Renvoie la liste des marchés avec affichage enrichi (ex. Dantokpa (Cotonou))."""
     marches = df[["market", "admin2"]].drop_duplicates().sort_values("market")
+    liste = []
+    for _, row in marches.iterrows():
+        m = str(row["market"])
+        a2 = str(row["admin2"]) if pd.notna(row["admin2"]) else ""
+        if a2 and a2.lower() not in m.lower():
+            nom_aff = f"{m} ({a2})"
+        else:
+            nom_aff = m
+        liste.append((nom_aff, m))
+    return liste
+
+
+def get_markets_for_commodity(df: pd.DataFrame, commodity_raw: str) -> List[Tuple[str, str]]:
+    """Renvoie strictement la liste des marchés où le produit sélectionné est présent."""
+    sub_df = df[df["commodity"] == commodity_raw]
+    marches = sub_df[["market", "admin2"]].drop_duplicates().sort_values("market")
     liste = []
     for _, row in marches.iterrows():
         m = str(row["market"])
@@ -363,10 +383,7 @@ def compare_markets_h1(
     horizon: int = 1,
     models_dir: str = "models"
 ) -> pd.DataFrame:
-    """Compare le marché principal et les marchés choisis pour l'horizon sélectionné.
-    
-    Garantit des types 100% chaîne pour une sérialisation PyArrow parfaite sans erreur de type.
-    """
+    """Compare le marché principal et les marchés choisis pour l'horizon sélectionné."""
     all_markets = [main_market] + [m for m in other_markets if m != main_market]
     rows = []
 
@@ -401,12 +418,173 @@ def compare_markets_h1(
 
 
 def get_model_benchmark_table(models_dir: str = "models") -> pd.DataFrame:
-    """Génère le tableau comparatif de l'Interface 1 (MAE par produit et modèle)."""
+    """Génère le tableau comparatif de l'Interface 1 strictement sur les 7 produits du dataset."""
     data = [
-        {"Produit": "Maïs", "Naïf": "11.6", "Naïf saisonnier": "68.1", "SARIMA": "—", "LightGBM": "23.0", "Random Forest": "25.4"},
-        {"Produit": "Riz", "Naïf": "20.7", "Naïf saisonnier": "91.3", "SARIMA": "—", "LightGBM": "43.6", "Random Forest": "38.4"},
-        {"Produit": "Haricot", "Naïf": "37.2", "Naïf saisonnier": "169.6", "SARIMA": "—", "LightGBM": "79.4", "Random Forest": "68.1"},
-        {"Produit": "Gari", "Naïf": "24.6", "Naïf saisonnier": "78.5", "SARIMA": "—", "LightGBM": "33.2", "Random Forest": "33.6"},
-        {"Produit": "Igname", "Naïf": "—", "Naïf saisonnier": "—", "SARIMA": "—", "LightGBM": "—", "Random Forest": "—"},
+        {"Produit": "Maïs blanc", "Naïf": "11.6", "Naïf saisonnier": "68.1", "SARIMA": "—", "LightGBM": "21.7", "Random Forest": "24.5"},
+        {"Produit": "Riz importé", "Naïf": "20.7", "Naïf saisonnier": "91.3", "SARIMA": "—", "LightGBM": "45.6", "Random Forest": "40.2"},
+        {"Produit": "Haricot blanc", "Naïf": "37.2", "Naïf saisonnier": "169.6", "SARIMA": "—", "LightGBM": "80.5", "Random Forest": "69.4"},
+        {"Produit": "Gari", "Naïf": "24.6", "Naïf saisonnier": "78.5", "SARIMA": "—", "LightGBM": "34.1", "Random Forest": "33.6"},
+        {"Produit": "Tomate", "Naïf": "112.8", "Naïf saisonnier": "164.2", "SARIMA": "—", "LightGBM": "99.4", "Random Forest": "99.4"},
+        {"Produit": "Huile d'arachide", "Naïf": "43.6", "Naïf saisonnier": "280.7", "SARIMA": "—", "LightGBM": "75.0", "Random Forest": "65.1"},
+        {"Produit": "Oignon", "Naïf": "94.4", "Naïf saisonnier": "181.2", "SARIMA": "—", "LightGBM": "91.8", "Random Forest": "89.4"},
     ]
     return pd.DataFrame(data).astype(str)
+
+
+def analyze_all_markets_for_commodity(
+    df_prices: pd.DataFrame,
+    commodity_raw: str,
+    horizon: int = 1,
+    model_choice: str = "Modèle final (recommandé)",
+    models_dir: str = "models"
+) -> pd.DataFrame:
+    """Analyse tous les marchés disponibles pour un produit donné à l'horizon H."""
+    markets = sorted(df_prices[df_prices["commodity"] == commodity_raw]["market"].dropna().unique().tolist())
+    
+    rows = []
+    col_name_prevu = f"Prévu M+{horizon}" if horizon > 1 else "Prévu M+1"
+    
+    for m in markets:
+        sub = df_prices[(df_prices["commodity"] == commodity_raw) & (df_prices["market"] == m)].sort_values("date")
+        if sub.empty:
+            continue
+            
+        last_row = sub.iloc[-1]
+        last_p = float(last_row["price"])
+        admin1 = last_row.get("admin1", "Inconnu")
+        region = "Nord" if admin1 in DEPARTEMENTS_NORD else "Sud"
+        
+        # Prédiction
+        pred_p = predict_price(commodity_raw, m, horizon, model_choice, df_prices, models_dir)
+        diff_fcfa = pred_p - last_p
+        var_pct = ((pred_p - last_p) / last_p) * 100 if last_p > 0 else 0.0
+        
+        rows.append({
+            "market": m,
+            "department": admin1,
+            "region": region,
+            "last_price": int(round(last_p)),
+            "pred_price": int(round(pred_p)),
+            "diff_fcfa": int(round(diff_fcfa)),
+            "var_pct": round(var_pct, 1)
+        })
+        
+    df_res = pd.DataFrame(rows)
+    return df_res
+
+
+def generate_market_intelligence_report(
+    df_analysis: pd.DataFrame,
+    commodity_name: str,
+    horizon: int,
+    regex_filter: Optional[str] = None
+) -> Dict[str, Any]:
+    """Génère un rapport d'intelligence économique avec analyse Regex."""
+    if df_analysis.empty:
+        return {"report_html": "<p>Aucune donnée disponible.</p>", "df_filtered": df_analysis}
+    
+    df = df_analysis.copy()
+    
+    # 1. Application du filtre Regex utilisateur si fourni
+    if regex_filter and regex_filter.strip():
+        try:
+            pattern = re.compile(regex_filter.strip(), re.IGNORECASE)
+            mask = df.apply(lambda row: bool(pattern.search(str(row["market"])) or pattern.search(str(row["department"])) or pattern.search(str(row["region"]))), axis=1)
+            df_filtered = df[mask].copy()
+        except re.error:
+            df_filtered = df.copy()
+    else:
+        df_filtered = df.copy()
+
+    # Statistiques globales
+    prix_moyen = df["pred_price"].mean()
+    prix_min = df["pred_price"].min()
+    prix_max = df["pred_price"].max()
+    var_moyenne = df["var_pct"].mean()
+
+    # Classements stratégiques
+    # Top 5 moins chers (meilleurs achats consommateurs / transformateurs)
+    top_achats = df.sort_values("pred_price", ascending=True).head(5)
+    
+    # Top 5 plus chers (meilleurs prix de vente pour les producteurs / négociants)
+    top_ventes = df.sort_values("pred_price", ascending=False).head(5)
+    
+    # Top 5 plus fortes hausses (marchés à surveiller / éviter pour les acheteurs)
+    top_hausses = df.sort_values("var_pct", ascending=False).head(5)
+    
+    # Top baisses ou stabilités
+    top_baisses = df.sort_values("var_pct", ascending=True).head(5)
+
+    # Analyse spatiale : Nord vs Sud avec regex sur les départements
+    nord_mask = df["department"].apply(lambda d: bool(re.search(r"^(Alibori|Atakora|Borgou|Donga)$", str(d), re.IGNORECASE)))
+    prix_nord = df[nord_mask]["pred_price"].mean() if nord_mask.any() else np.nan
+    prix_sud = df[~nord_mask]["pred_price"].mean() if (~nord_mask).any() else np.nan
+
+    # Construction du texte brut du rapport
+    lignes_rapport = [
+        f"### 📋 Rapport d'Analyse Prévisionnelle : {commodity_name} à M+{horizon}",
+        f"- **Nombre de marchés analysés** : {len(df)} marchés actifs à travers le Bénin.",
+        f"- **Fourchette nationale** : De **{int(prix_min)} FCFA** à **{int(prix_max)} FCFA** (Moyenne : **{int(prix_moyen)} FCFA**, Tendance globale : **{var_moyenne:+.1f} %**).",
+        "",
+        "#### 🏆 1. Meilleurs points d'achat (À PRIVILÉGIER pour acheteurs & consommateurs)",
+        "Les marchés suivants offrent les prix prévus les plus bas du territoire :"
+    ]
+    
+    for _, r in top_achats.iterrows():
+        lignes_rapport.append(f"  * **{r['market']}** ({r['department']}) : **{r['pred_price']} FCFA** ({r['var_pct']:+.1f} %)")
+        
+    lignes_rapport.extend([
+        "",
+        "#### 💰 2. Meilleurs points de vente (OPPORTUNITÉ pour producteurs & grossistes)",
+        "Les marchés où écouler sa production au prix le plus rémunérateur :"
+    ])
+    for _, r in top_ventes.iterrows():
+        lignes_rapport.append(f"  * **{r['market']}** ({r['department']}) : **{r['pred_price']} FCFA** (Écart à la moyenne : **{int(r['pred_price'] - prix_moyen):+d} FCFA**)")
+        
+    lignes_rapport.extend([
+        "",
+        "#### ⚠️ 3. Marchés en surchauffe (À ÉVITER pour les approvisionnements / Risque d'inflation)",
+        "Ces places commerciales subissent les plus fortes accélérations tarifaires :"
+    ])
+    for _, r in top_hausses.iterrows():
+        if r["var_pct"] > 0:
+            lignes_rapport.append(f"  * **{r['market']}** ({r['department']}) : **{r['pred_price']} FCFA** [HAUSSE FORTE : **{r['var_pct']:+.1f} %**]")
+
+    if pd.notna(prix_nord) and pd.notna(prix_sud):
+        diff_ns = prix_nord - prix_sud
+        sens = "plus cher" if diff_ns > 0 else "moins cher"
+        lignes_rapport.extend([
+            "",
+            "#### 🗺️ 4. Disparité Régionale (Nord vs Sud)",
+            f"- **Moyenne Grand Nord** : **{int(prix_nord)} FCFA**",
+            f"- **Moyenne Grand Sud** : **{int(prix_sud)} FCFA**",
+            f"- Le Grand Nord est en moyenne **{abs(int(diff_ns))} FCFA** {sens} que le Grand Sud pour cette denrée."
+        ])
+
+    raw_text = "\n".join(lignes_rapport)
+
+    # 2. Utilisation de REGEX pour enrichir et mettre en valeur les termes stratégiques
+    # Coloration verte pour les opportunités et recommandations favorables
+    styled_html = re.sub(
+        r"\b(À PRIVILÉGIER|OPPORTUNITÉ|Meilleurs points d'achat|PRIX BAS)\b",
+        r"<span style='color: #15803D; font-weight: bold;'>\1</span>",
+        raw_text
+    )
+    # Coloration rouge pour les alertes, risques et marchés à éviter
+    styled_html = re.sub(
+        r"\b(À ÉVITER|HAUSSE FORTE|Marchés en surchauffe|Risque d'inflation)\b",
+        r"<span style='color: #DC2626; font-weight: bold;'>\1</span>",
+        styled_html
+    )
+
+    return {
+        "raw_text": raw_text,
+        "styled_text": styled_html,
+        "df_filtered": df_filtered,
+        "top_achats": top_achats,
+        "top_ventes": top_ventes,
+        "top_hausses": top_hausses,
+        "prix_min": prix_min,
+        "prix_max": prix_max,
+        "prix_moyen": prix_moyen
+    }

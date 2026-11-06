@@ -1,8 +1,9 @@
 """Application Streamlit de Prévision des Prix des Denrées Alimentaires au Bénin.
 
-Interfaces conformes aux maquettes :
-1. Prévision des prix des denrées au Bénin (Inférence & Comparaison des marchés)
-2. À propos des modèles (Tableau de bord de performance & gouvernance ML)
+Interfaces :
+1. 🔮 Prévision des prix (Inférence unitaire & Comparaison ciblée)
+2. 📊 À propos des modèles (Tableau de bord de performance ML sur le dataset)
+3. 🔍 Analyse approfondie (Intelligence économique, disparités territoriales & rapport Regex)
 """
 
 from pathlib import Path
@@ -23,9 +24,12 @@ from src.inference import (
     load_metadata,
     get_available_commodities,
     get_available_markets,
+    get_markets_for_commodity,
     get_forecast_trajectory,
     compare_markets_h1,
     get_model_benchmark_table,
+    analyze_all_markets_for_commodity,
+    generate_market_intelligence_report,
     NOMS_PRODUITS,
     PRODUITS_INVERSES,
 )
@@ -53,13 +57,23 @@ def load_app_metadata():
     models_dir = root_dir / "models"
     return load_metadata(str(models_dir))
 
+@st.cache_data
+def cached_market_analysis(comm_raw, horizon, model, _df):
+    models_dir = str(root_dir / "models")
+    return analyze_all_markets_for_commodity(
+        df_prices=_df,
+        commodity_raw=comm_raw,
+        horizon=horizon,
+        model_choice=model,
+        models_dir=models_dir
+    )
+
 df_prices = load_app_data()
 metadata = load_app_metadata()
 
-# Style CSS compact pour que l'ensemble du dashboard tienne sur un seul écran
+# Style CSS compact
 st.markdown("""
 <style>
-    /* Réduction globale des marges de la page */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 0.5rem !important;
@@ -74,7 +88,6 @@ st.markdown("""
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Cartes compactes */
     .metric-card {
         background-color: #FFFFFF;
         border: 1px solid #EBE9E1;
@@ -97,7 +110,6 @@ st.markdown("""
         line-height: 1.2;
     }
     
-    /* Titres et espacements compacts */
     .main-title {
         font-size: 20px;
         font-weight: 700;
@@ -124,7 +136,6 @@ st.markdown("""
         color: #111827;
     }
     
-    /* Pied de page discret et compact */
     .app-footer {
         margin-top: 8px;
         padding-top: 6px;
@@ -134,7 +145,6 @@ st.markdown("""
         text-align: left;
     }
     
-    /* Tableaux compacts */
     .dataframe {
         font-size: 12px !important;
     }
@@ -145,21 +155,22 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# --- NAVIGATION ENTRE LES DEUX INTERFACES ---
+# --- NAVIGATION ENTRE LES TROIS INTERFACES ---
 page_choice = st.sidebar.radio(
     "Navigation",
-    ["🔮 Prévision des prix", "📊 À propos des modèles"],
+    ["🔮 Prévision des prix", "📊 À propos des modèles", "🔍 Analyse approfondie"],
     label_visibility="collapsed"
 )
 
 st.sidebar.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+
 
 # ==============================================================================
 # INTERFACE 1 : « À PROPOS DES MODÈLES »
 # ==============================================================================
 if page_choice == "📊 À propos des modèles":
     st.markdown("<div class='main-title'>À propos des modèles</div>", unsafe_allow_html=True)
-    st.markdown("<div class='main-subtitle'>Erreur moyenne (MAE, en FCFA/kg) sur la période de test, par produit et par modèle.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='main-subtitle'>Erreur moyenne (MAE, en FCFA/kg) sur la période de test (2025–2026), par produit du dataset et par modèle.</div>", unsafe_allow_html=True)
 
     modele_nom = metadata.get("modele_final", "random_forest")
     modele_label = "Random Forest" if modele_nom == "random_forest" else "LightGBM"
@@ -194,10 +205,10 @@ if page_choice == "📊 À propos des modèles":
         </div>
         """, unsafe_allow_html=True)
 
-    # Tableau comparatif
+    # Tableau comparatif des 7 produits réels du dataset
     st.markdown("""
     <div class="section-box">
-        <div class="section-title">Comparaison des modèles par produit (MAE)</div>
+        <div class="section-title">Comparaison des modèles par produit du dataset (MAE)</div>
     """, unsafe_allow_html=True)
 
     df_bench = get_model_benchmark_table(str(root_dir / "models"))
@@ -218,11 +229,10 @@ if page_choice == "📊 À propos des modèles":
 # ==============================================================================
 # INTERFACE 2 : « PRÉVISION DES PRIX DES DENRÉES AU BÉNIN »
 # ==============================================================================
-else:
-    # --- BARRE LATÉRALE : PARAMÈTRES COMPACTS ---
+elif page_choice == "🔮 Prévision des prix":
     st.sidebar.markdown("<div style='font-size: 15px; font-weight: 700; margin-bottom: 8px;'>Paramètres</div>", unsafe_allow_html=True)
 
-    # 1. Produit
+    # 1. Sélection du Produit
     commodities_list = get_available_commodities(df_prices)
     commo_display_names = [c[0] for c in commodities_list]
     commo_dict = dict(commodities_list)
@@ -230,10 +240,10 @@ else:
     selected_commo_display = st.sidebar.selectbox("Produit", commo_display_names, index=0)
     selected_commodity_raw = commo_dict[selected_commo_display]
 
-    # 2. Marché
-    markets_list = get_available_markets(df_prices)
-    market_display_names = [m[0] for m in markets_list]
-    market_dict = dict(markets_list)
+    # 2. Marchés strictement disponibles pour ce produit
+    markets_for_product = get_markets_for_commodity(df_prices, selected_commodity_raw)
+    market_display_names = [m[0] for m in markets_for_product]
+    market_dict = dict(markets_for_product)
 
     default_m_idx = 0
     for idx, name in enumerate(market_display_names):
@@ -241,7 +251,7 @@ else:
             default_m_idx = idx
             break
 
-    selected_market_display = st.sidebar.selectbox("Marché", market_display_names, index=default_m_idx)
+    selected_market_display = st.sidebar.selectbox("Marché principal", market_display_names, index=default_m_idx)
     selected_market_raw = market_dict[selected_market_display]
 
     # 3. Horizon de prévision
@@ -255,24 +265,29 @@ else:
         index=0
     )
 
-    # 5. Comparer avec d'autres marchés
-    st.sidebar.markdown("<div style='margin-top: 8px; margin-bottom: 4px; font-weight: 500; font-size: 13px;'>Comparer avec d'autres marchés</div>", unsafe_allow_html=True)
+    # 5. Comparer avec d'autres marchés (Liste déroulante parmi ceux disponibles pour ce produit)
+    compare_candidates = [m[0] for m in markets_for_product if m[1] != selected_market_raw]
     
-    compare_parakou = st.sidebar.checkbox("Parakou", value=True)
-    compare_bohicon = st.sidebar.checkbox("Bohicon", value=True)
-    compare_natitingou = st.sidebar.checkbox("Natitingou", value=False)
-    
-    other_markets_to_compare = []
-    if compare_parakou:
-        other_markets_to_compare.append("Parakou")
-    if compare_bohicon:
-        other_markets_to_compare.append("Bohicon")
-    if compare_natitingou:
-        other_markets_to_compare.append("Natitingou")
+    # Sélection par défaut intelligente
+    default_selected_comparisons = []
+    for cand in compare_candidates:
+        if any(target in cand for target in ["Parakou", "Bohicon", "Natitingou"]):
+            default_selected_comparisons.append(cand)
+            if len(default_selected_comparisons) == 2:
+                break
+    if not default_selected_comparisons and len(compare_candidates) >= 2:
+        default_selected_comparisons = compare_candidates[:2]
+
+    selected_comparisons_display = st.sidebar.multiselect(
+        "Comparer avec d'autres marchés",
+        options=compare_candidates,
+        default=default_selected_comparisons
+    )
+    other_markets_to_compare = [market_dict[d] for d in selected_comparisons_display]
 
     st.sidebar.markdown("<br><p style='font-size: 11px; color: #9CA3AF;'>Données : PAM / HDX, relevés mensuels de 2002 à 2026.</p>", unsafe_allow_html=True)
 
-    # --- CALCUL DE L'INFÉRENCE RÉACTIF À L'HORIZON ---
+    # Inférence réactive
     models_dir = str(root_dir / "models")
     traj = get_forecast_trajectory(
         commodity=selected_commodity_raw,
@@ -291,11 +306,11 @@ else:
     preds_table = traj["predictions_table"]
     df_chart_hist = traj["df_chart_hist"]
 
-    # --- EN-TÊTE PRINCIPAL ---
+    # En-tête
     st.markdown("<div class='main-title'>Prévision des prix des denrées au Bénin</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='main-subtitle'><strong>{selected_commo_display}</strong> · <strong>{selected_market_display}</strong> · prix de détail en FCFA/kg</div>", unsafe_allow_html=True)
 
-    # --- 3 CARTES KPIS EN HAUT ---
+    # 3 Cartes KPIs
     kpi1, kpi2, kpi3 = st.columns(3)
     with kpi1:
         st.markdown(f"""
@@ -321,7 +336,7 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-    # --- GRAPHIQUE HISTORIQUE ET PRÉVISION ---
+    # Graphique
     st.markdown("""
     <div class="section-box">
         <div class="section-title">Historique et prévision</div>
@@ -332,7 +347,6 @@ else:
     hist_chart_df["borne_basse"] = hist_chart_df["prix"]
     hist_chart_df["borne_haute"] = hist_chart_df["prix"]
 
-    # Raccordement exact depuis le dernier point historique vers les prévisions de l'horizon sélectionné
     last_hist_pt = hist_chart_df.iloc[-1]
     forecast_points = [{
         "date": last_hist_pt["date"],
@@ -394,7 +408,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- DEUX TABLEAUX INFÉRIEURS ---
+    # Deux tableaux inférieurs
     col_tab_left, col_tab_right = st.columns(2)
 
     with col_tab_left:
@@ -432,7 +446,7 @@ else:
         st.dataframe(df_comp, width="stretch", hide_index=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- PIED DE PAGE DISCRET ---
+    # Pied de page
     active_model_name = metadata.get("modele_final", "random_forest")
     v_str = metadata.get("version", "1.0.0")
     date_tr = metadata.get("date_entrainement", "2026-11-06")
@@ -443,3 +457,129 @@ else:
         Modèle : <strong>{active_model_name}</strong> · version <strong>{v_str}</strong> · entraîné le <strong>{date_tr}</strong> · erreur moyenne sur le test : <strong>{mae_test} FCFA/kg</strong>.
     </div>
     """, unsafe_allow_html=True)
+
+
+# ==============================================================================
+# INTERFACE 3 : « 🔍 ANALYSE APPROFONDIE »
+# ==============================================================================
+else:
+    st.markdown("<div class='main-title'>Analyse approfondie & Intelligence Territoriale</div>", unsafe_allow_html=True)
+    st.markdown("<div class='main-subtitle'>Cartographie prévisionnelle multi-marchés, points de vente optimaux et détection de tensions tarifaires.</div>", unsafe_allow_html=True)
+
+    # Paramètres d'analyse
+    c1, c2, c3 = st.columns([1.5, 1, 1.2])
+    with c1:
+        commodities_list = get_available_commodities(df_prices)
+        commo_display_names = [c[0] for c in commodities_list]
+        commo_dict = dict(commodities_list)
+        sel_commo_display = st.selectbox("Produit à analyser", commo_display_names, index=0)
+        sel_comm_raw = commo_dict[sel_commo_display]
+    with c2:
+        sel_horizon_str = st.selectbox("Horizon prévisionnel", ["1 mois", "2 mois", "3 mois"], index=0)
+        sel_horizon = int(sel_horizon_str.split()[0])
+    with c3:
+        sel_model = st.selectbox("Modèle d'estimation", ["Modèle final (recommandé)", "Random Forest", "LightGBM", "Naïf"], index=0)
+
+    # Barre de recherche / filtre Regex
+    regex_input = st.text_input(
+        "🔎 Filtre Regex sur les marchés / départements / régions (ex: 'Cotonou|Parakou', 'Nord', 'Littoral|Atlantique')",
+        value="",
+        placeholder="Entrez une expression régulière ou laissez vide pour tous les marchés..."
+    )
+
+    # Calcul de l'analyse sur tous les marchés
+    with st.spinner("Analyse prévisionnelle de tous les marchés du Bénin en cours..."):
+        df_all_markets = cached_market_analysis(sel_comm_raw, sel_horizon, sel_model, df_prices)
+
+    report_data = generate_market_intelligence_report(
+        df_analysis=df_all_markets,
+        commodity_name=sel_commo_display,
+        horizon=sel_horizon,
+        regex_filter=regex_input
+    )
+
+    # Indicateurs synthétiques
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-label">Marchés analysés</div>
+            <div class="metric-card-value">{len(report_data['df_filtered'])}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with k2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-label">Prix prévu le plus bas</div>
+            <div class="metric-card-value" style="color: #15803D;">{int(report_data['prix_min'])} FCFA</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with k3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-label">Prix prévu moyen national</div>
+            <div class="metric-card-value">{int(report_data['prix_moyen'])} FCFA</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with k4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-label">Prix prévu le plus élevé</div>
+            <div class="metric-card-value" style="color: #DC2626;">{int(report_data['prix_max'])} FCFA</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- VISUALISATION GRAPHIQUE PERTINENTE : TOP 5 MOINS CHERS vs TOP 5 PLUS CHERS ---
+    st.markdown("""
+    <div class="section-box">
+        <div class="section-title">Différentiel de prix : Top 5 Meilleurs Achats (Moins chers) vs Top 5 Meilleurs Ventes (Plus chers)</div>
+    """, unsafe_allow_html=True)
+
+    top_lo = report_data["top_achats"].copy()
+    top_lo["Catégorie"] = "🟢 Meilleurs Achats (Prix bas)"
+    top_hi = report_data["top_ventes"].copy()
+    top_hi["Catégorie"] = "🔴 Meilleurs Ventes (Prix fort)"
+    df_chart_top = pd.concat([top_lo, top_hi], ignore_index=True)
+
+    bar_chart = alt.Chart(df_chart_top).mark_bar(cornerRadius=4).encode(
+        y=alt.Y("market:N", sort="-x", title=None, axis=alt.Axis(labelFontSize=11)),
+        x=alt.X("pred_price:Q", title="Prix prévu (FCFA/kg)", scale=alt.Scale(zero=False)),
+        color=alt.Color("Catégorie:N", scale=alt.Scale(domain=["🟢 Meilleurs Achats (Prix bas)", "🔴 Meilleurs Ventes (Prix fort)"], range=["#2D6A4F", "#DC2626"]), legend=alt.Legend(title=None, orient="top")),
+        tooltip=[
+            alt.Tooltip("market:N", title="Marché"),
+            alt.Tooltip("department:N", title="Département"),
+            alt.Tooltip("pred_price:Q", title="Prix prévu (FCFA)"),
+            alt.Tooltip("var_pct:Q", title="Variation (%)")
+        ]
+    ).properties(height=240)
+
+    st.altair_chart(bar_chart, width="stretch")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- DEUX COLONNES : RAPPORT INTELLIGENT (REGEX) & TABLEAU INTÉGRAL ---
+    c_rep, c_tab = st.columns([1.3, 1.2])
+
+    with c_rep:
+        st.markdown("""
+        <div class="section-box" style="height: 100%;">
+            <div class="section-title">Rapport d'aide à la décision & Détection de tensions (Moteur Regex)</div>
+        """, unsafe_allow_html=True)
+        st.markdown(report_data["styled_text"], unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c_tab:
+        st.markdown("""
+        <div class="section-box" style="height: 100%;">
+            <div class="section-title">Données complètes des marchés</div>
+        """, unsafe_allow_html=True)
+
+        df_display_table = report_data["df_filtered"][["market", "department", "region", "last_price", "pred_price", "var_pct"]].copy()
+        df_display_table.columns = ["Marché", "Département", "Région", "Dernier prix", f"Prévu M+{sel_horizon}", "Variation (%)"]
+        
+        # Format d'affichage
+        df_display_table["Dernier prix"] = df_display_table["Dernier prix"].apply(lambda v: f"{v} FCFA")
+        df_display_table[f"Prévu M+{sel_horizon}"] = df_display_table[f"Prévu M+{sel_horizon}"].apply(lambda v: f"{v} FCFA")
+        df_display_table["Variation (%)"] = df_display_table["Variation (%)"].apply(lambda v: f"{v:+.1f} %")
+
+        st.dataframe(df_display_table.astype(str), width="stretch", hide_index=True)
+        st.markdown("</div>", unsafe_allow_html=True)
