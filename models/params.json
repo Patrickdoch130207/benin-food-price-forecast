@@ -3,8 +3,8 @@
     "h1": {
       "criterion": "absolute_error",
       "n_estimators": 150,
-      "max_depth": 7,
-      "min_samples_leaf": 12,
+      "max_depth": 8,
+      "min_samples_leaf": 10,
       "max_features": 0.7,
       "shrinkage": 0.65
     },
@@ -14,7 +14,7 @@
       "max_depth": 8,
       "min_samples_leaf": 8,
       "max_features": 0.7,
-      "shrinkage": 0.6
+      "shrinkage": 0.65
     },
     "h3": {
       "criterion": "absolute_error",
@@ -22,42 +22,71 @@
       "max_depth": 8,
       "min_samples_leaf": 8,
       "max_features": 0.7,
-      "shrinkage": 0.6
+      "shrinkage": 0.65
     }
   },
   "lightgbm": {
     "h1": {
       "objective": "mae",
-      "n_estimators": 150,
+      "n_estimators": 140,
       "learning_rate": 0.03,
       "max_depth": 5,
       "num_leaves": 15,
       "min_child_samples": 25,
       "subsample": 0.8,
       "colsample_bytree": 0.8,
-      "shrinkage": 0.75
+      "shrinkage": 0.80
     },
     "h2": {
       "objective": "mae",
-      "n_estimators": 150,
+      "n_estimators": 140,
       "learning_rate": 0.03,
       "max_depth": 5,
       "num_leaves": 15,
       "min_child_samples": 25,
       "subsample": 0.8,
       "colsample_bytree": 0.8,
-      "shrinkage": 0.75
+      "shrinkage": 0.80
     },
     "h3": {
       "objective": "mae",
-      "n_estimators": 150,
+      "n_estimators": 140,
       "learning_rate": 0.03,
       "max_depth": 5,
       "num_leaves": 15,
       "min_child_samples": 25,
       "subsample": 0.8,
       "colsample_bytree": 0.8,
-      "shrinkage": 0.75
+      "shrinkage": 0.80
+    }
+  },
+  "xgboost": {
+    "h1": {
+      "objective": "reg:absoluteerror",
+      "n_estimators": 130,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "shrinkage": 0.80
+    },
+    "h2": {
+      "objective": "reg:absoluteerror",
+      "n_estimators": 130,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "shrinkage": 0.80
+    },
+    "h3": {
+      "objective": "reg:absoluteerror",
+      "n_estimators": 130,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "shrinkage": 0.80
     }
   }
 }

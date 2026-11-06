@@ -48,6 +48,10 @@ FEATURES = [
     "mois_annee",
     "latitude",
     "nord",
+    "mois_sin",
+    "mois_cos",
+    "ratio_local_nat_m1",
+    "ratio_m1_m12",
 ]
 
 
@@ -126,6 +130,15 @@ def construire_features(prix, debut="2019-01", fin=None):
     feats["annee"] = feats["mois"].dt.year
     feats["produit"] = feats["commodity"].map(NOMS_PRODUITS)
     feats["date"] = feats["mois"].dt.to_timestamp()
+
+    # 7. Features statistiques avancées sans fuite (harmoniques cycliques & ratios de divergence)
+    mois_rad = 2 * np.pi * feats["mois_annee"].to_numpy(dtype=float) / 12.0
+    feats["mois_sin"] = np.sin(mois_rad)
+    feats["mois_cos"] = np.cos(mois_rad)
+
+    prix_ref_m1 = feats["prix_m1"].fillna(feats["prix_dernier_connu"]).fillna(feats["med_nat_m1"])
+    feats["ratio_local_nat_m1"] = (prix_ref_m1 / feats["med_nat_m1"]).clip(0.3, 3.0)
+    feats["ratio_m1_m12"] = (prix_ref_m1 / feats["prix_m12"]).clip(0.3, 3.0)
 
     colonnes = ["commodity", "produit", "market", "admin1", "mois", "date", "annee", "prix"] + FEATURES
     return feats[colonnes].sort_values(["commodity", "market", "mois"]).reset_index(drop=True)

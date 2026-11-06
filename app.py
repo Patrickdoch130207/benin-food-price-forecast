@@ -28,6 +28,7 @@ from src.inference import (
     get_forecast_trajectory,
     compare_markets_h1,
     get_model_benchmark_table,
+    get_statistical_kpi_table,
     analyze_all_markets_for_commodity,
     generate_market_intelligence_report,
     NOMS_PRODUITS,
@@ -217,12 +218,29 @@ if page_choice == "📊 À propos des modèles":
         return "background-color: #E6F4EA; font-weight: 600;"
 
     style_method = df_bench.style.map if hasattr(df_bench.style, "map") else df_bench.style.applymap
-    styled_df = style_method(
-        highlight_final_column,
-        subset=[modele_label]
-    )
+    target_subset = [modele_label] if modele_label in df_bench.columns else []
+    if target_subset:
+        styled_df = style_method(highlight_final_column, subset=target_subset)
+    else:
+        styled_df = df_bench
 
     st.dataframe(styled_df, width="stretch", hide_index=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Section des KPIs statistiques par produit (tests ADF, saisonnalité, inertie)
+    st.markdown("""
+    <div class="section-box">
+        <div class="section-title">🧪 Diagnostic Statistique Rigoureux & KPIs par Produit</div>
+        <p style="font-size: 11px; color: #6B7280; margin-bottom: 8px;">
+            Tests formels d'hypothèses sur les séries nationales : stationnarité (Augmented Dickey-Fuller t-stat < -2.89), test non-paramétrique de saisonnalité (Kruskal-Wallis à 12 mois), persistance temporelle (autocorrélations M-1 et M-12) et asymétrie de distribution.
+        </p>
+    """, unsafe_allow_html=True)
+
+    df_kpis = get_statistical_kpi_table(str(root_dir / "models"))
+    if not df_kpis.empty:
+        st.dataframe(df_kpis, width="stretch", hide_index=True)
+    else:
+        st.info("KPIs statistiques non disponibles dans les métadonnées.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -499,7 +517,9 @@ else:
         df_analysis=df_all_markets,
         commodity_name=sel_commo_display,
         horizon=sel_horizon,
-        regex_filter=regex_input
+        regex_filter=regex_input,
+        commodity_raw=sel_comm_raw,
+        models_dir=str(root_dir / "models")
     )
 
     # Indicateurs synthétiques

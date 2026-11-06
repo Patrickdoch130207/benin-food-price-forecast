@@ -252,6 +252,10 @@ def build_inference_row(
         "ecart_marche": ecart_marche,
         "mois_annee": month,
         "nord": nord_flag,
+        "mois_sin": month_sin,
+        "mois_cos": month_cos,
+        "ratio_local_nat_m1": ratio_local_nat_lag1,
+        "ratio_m1_m12": float(np.clip(lag_1 / lag_12, 0.3, 3.0)) if lag_12 != 0 else 1.0,
         # Compatibilité descendante
         "lag_1": lag_1,
         "lag_2": lag_2,
@@ -489,7 +493,26 @@ def compare_markets_h1(
 
 def get_model_benchmark_table(models_dir: str = "models") -> pd.DataFrame:
     """Génère le tableau comparatif de l'Interface 1 strictement sur les 7 produits du dataset."""
-    # Valeurs réelles calculées sur le jeu de test scellé (2025–2026)
+    meta = load_metadata(models_dir)
+    prod_metrics = meta.get("metriques_par_produit", {})
+
+    produits = ["Maïs blanc", "Riz importé", "Haricot blanc", "Gari", "Tomate", "Huile d'arachide", "Oignon"]
+
+    if prod_metrics and "lightgbm" in prod_metrics and "random_forest" in prod_metrics:
+        rows = []
+        for p in produits:
+            row = {"Produit": p}
+            row["Naïf"] = str(round(prod_metrics.get("naif", {}).get(p, 54.0), 1))
+            row["Naïf saisonnier"] = str(round(prod_metrics.get("naif_saisonnier", {}).get(p, 140.0), 1))
+            row["SARIMA"] = str(round(prod_metrics.get("sarima", {}).get(p, 80.0), 1))
+            row["LightGBM"] = str(round(prod_metrics.get("lightgbm", {}).get(p, 50.0), 1))
+            row["Random Forest"] = str(round(prod_metrics.get("random_forest", {}).get(p, 50.0), 1))
+            if "xgboost" in prod_metrics:
+                row["XGBoost"] = str(round(prod_metrics.get("xgboost", {}).get(p, 50.0), 1))
+            rows.append(row)
+        return pd.DataFrame(rows).astype(str)
+
+    # Valeurs de repli
     data = [
         {"Produit": "Maïs blanc", "Naïf": "11.6", "Naïf saisonnier": "68.1", "SARIMA": "54.0", "LightGBM": "21.7", "Random Forest": "24.5"},
         {"Produit": "Riz importé", "Naïf": "20.7", "Naïf saisonnier": "55.0", "SARIMA": "39.8", "LightGBM": "45.6", "Random Forest": "40.2"},
@@ -500,6 +523,38 @@ def get_model_benchmark_table(models_dir: str = "models") -> pd.DataFrame:
         {"Produit": "Oignon", "Naïf": "94.4", "Naïf saisonnier": "181.2", "SARIMA": "282.0", "LightGBM": "91.8", "Random Forest": "89.4"},
     ]
     return pd.DataFrame(data).astype(str)
+
+
+def get_statistical_kpi_table(models_dir: str = "models") -> pd.DataFrame:
+    """Renvoie le tableau synthétique des tests statistiques et KPIs de modélisation par produit."""
+    meta = load_metadata(models_dir)
+    kpis = meta.get("kpis_statistiques_produits", {})
+    if not kpis:
+        return pd.DataFrame()
+
+    rows = []
+    for comm, info in kpis.items():
+        nom = info.get("nom_fr", comm)
+        p_moy = info.get("prix_moyen", "-")
+        cv = f"{info.get('cv_pct', '-')}% ({info.get('volatilite', '-')})"
+        stat_statut = "Stationnaire" if info.get("stationnaire") else "Non-stationnaire"
+        adf = f"{stat_statut} (t={info.get('adf_t_stat', '-')})"
+        sais_statut = "Oui (p < 0.05)" if info.get("saisonnier") else "Non"
+        ac1 = info.get("autocorr_lag1", "-")
+        ac12 = info.get("autocorr_lag12", "-")
+        skew = info.get("skewness", "-")
+
+        rows.append({
+            "Produit": nom,
+            "Prix moyen": f"{p_moy} FCFA",
+            "Volatilité (CV)": cv,
+            "Stationnarité (ADF)": adf,
+            "Saisonnalité (KW)": sais_statut,
+            "Inertie M-1": f"{ac1}",
+            "Saison M-12": f"{ac12}",
+            "Asymétrie": f"{skew}"
+        })
+    return pd.DataFrame(rows)
 
 
 def analyze_all_markets_for_commodity(
@@ -545,14 +600,16 @@ def generate_market_intelligence_report(
     df_analysis: pd.DataFrame,
     commodity_name: str,
     horizon: int,
-    regex_filter: Optional[str] = None
+    regex_filter: Optional[str] = None,
+    commodity_raw: Optional[str] = None,
+    models_dir: str = "models"
 ) -> Dict[str, Any]:
-    """Génère un rapport d'intelligence économique avec analyse Regex."""
+    """Génère un rapport d'intelligence économique avec analyse Regex et KPIs statistiques."""
     if df_analysis.empty:
         return {"report_html": "<p>Aucune donnée disponible.</p>", "df_filtered": df_analysis}
-    
+
     df = df_analysis.copy()
-    
+
     if regex_filter and regex_filter.strip():
         try:
             pattern = re.compile(regex_filter.strip(), re.IGNORECASE)
@@ -576,14 +633,32 @@ def generate_market_intelligence_report(
     prix_nord = df[nord_mask]["pred_price"].mean() if nord_mask.any() else np.nan
     prix_sud = df[~nord_mask]["pred_price"].mean() if (~nord_mask).any() else np.nan
 
+    # Récupération du profil statistique du produit
+    meta = load_metadata(models_dir)
+    kpis = meta.get("kpis_statistiques_produits", {})
+    prod_kpi = kpis.get(commodity_raw or "", {})
+
     lignes_rapport = [
         f"### 📋 Rapport d'Analyse Prévisionnelle : {commodity_name} à M+{horizon}",
         f"- **Nombre de marchés analysés** : {len(df)} marchés actifs à travers le Bénin.",
-        f"- **Fourchette nationale** : De **{int(prix_min)} FCFA** à **{int(prix_max)} FCFA** (Moyenne : **{int(prix_moyen)} FCFA**, Tendance globale : **{var_moyenne:+.1f} %**).",
+        f"- **Fourchette nationale** : De **{int(prix_min)} FCFA** à **{int(prix_max)} FCFA** (Moyenne : **{int(prix_moyen)} FCFA**, Tendance globale : **{var_moyenne:+.1f} %**)."
+    ]
+
+    if prod_kpi:
+        vol = prod_kpi.get("volatilite", "Modérée")
+        cv = prod_kpi.get("cv_pct", "-")
+        sais = "Marquée (cycles agro-climatiques)" if prod_kpi.get("saisonnier") else "Faible / Insensible aux saisons locales"
+        stat = "Stationnaire autour de cycles" if prod_kpi.get("stationnaire") else "Non-stationnaire (tendance macro / chocs d'offre)"
+        ac1 = prod_kpi.get("autocorr_lag1", "-")
+        lignes_rapport.append(
+            f"- **Profil statistique & KPIs de la denrée** : Volatilité **{vol}** (CV={cv}%), Saisonnalité **{sais}**, Dynamique **{stat}**, Persistance à 1 mois **{ac1}**."
+        )
+
+    lignes_rapport.extend([
         "",
         "#### 🏆 1. Meilleurs points d'achat (À PRIVILÉGIER pour acheteurs & consommateurs)",
         "Les marchés suivants offrent les prix prévus les plus bas du territoire :"
-    ]
+    ])
     
     for _, r in top_achats.iterrows():
         lignes_rapport.append(f"  * **{r['market']}** ({r['department']}) : **{r['pred_price']} FCFA** ({r['var_pct']:+.1f} %)")

@@ -37,12 +37,19 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 RANDOM_STATE = 42
 
-# Vérification dynamique de LightGBM
+# Vérification dynamique de LightGBM et XGBoost
 try:
     from lightgbm import LGBMRegressor
     LIGHTGBM_AVAILABLE = True
 except ImportError:
     LIGHTGBM_AVAILABLE = False
+
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+
 
 
 class AnchorResidualRegressor(BaseEstimator, RegressorMixin):
@@ -147,6 +154,21 @@ def build_pipeline(
             "verbosity": -1
         }
         estimator = LGBMRegressor(**model_params)
+    elif algo == "xgboost":
+        if not XGBOOST_AVAILABLE:
+            raise ImportError("XGBoost n'est pas installé. Exécuter 'pip install xgboost'.")
+        shrinkage = float(params.get("shrinkage", 0.80))
+        model_params = {
+            "objective": params.get("objective", "reg:absoluteerror"),
+            "n_estimators": int(params.get("n_estimators", 130)),
+            "learning_rate": float(params.get("learning_rate", 0.03)),
+            "max_depth": int(params.get("max_depth", 5)),
+            "subsample": float(params.get("subsample", 0.8)),
+            "colsample_bytree": float(params.get("colsample_bytree", 0.8)),
+            "random_state": RANDOM_STATE,
+            "n_jobs": -1
+        }
+        estimator = xgb.XGBRegressor(**model_params)
     else:
         raise ValueError(f"Algorithme inconnu : {algo}")
 
@@ -291,7 +313,7 @@ def train_all(df: pd.DataFrame, output_dir: str = "models", params_dir: str = "m
     cat_cols, num_cols = get_default_feature_names(df)
     features = cat_cols + num_cols
 
-    algos = ["random_forest"] + (["lightgbm"] if LIGHTGBM_AVAILABLE else [])
+    algos = ["random_forest"] + (["lightgbm"] if LIGHTGBM_AVAILABLE else []) + (["xgboost"] if XGBOOST_AVAILABLE else [])
     horizons = [1, 2, 3]
     metrics_out = {}
 
