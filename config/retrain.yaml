@@ -1,0 +1,55 @@
+# Configuration du réentraînement automatique mensuel
+# Prévision des prix des denrées vivrières au Bénin (PAM / HDX)
+
+paths:
+  raw_data_dir: "data/raw"
+  processed_data: "data/prix_propres.parquet"
+  features_data: "data/features.parquet"
+  models_dir: "models"
+  archive_dir: "models/archive"
+  candidate_dir: "models_candidate"
+  log_file: "models/retrain_log.jsonl"
+  params_file: "models/params.json"
+  metadata_file: "models/metadata.json"
+
+source:
+  type: "csv_direct" # 'csv_direct', 'hdx_ckan', 'huggingface' ou 'local'
+  csv_url: "https://data.humdata.org/dataset/66c7d54e-0c3b-45e5-9a46-07ea6f195093/resource/7da1ea0a-56c7-450a-af2c-d477745fc856/download/wfp_food_prices_ben.csv"
+  hdx_package_id: "wfp-food-prices-for-benin"
+  ckan_api_url: "https://data.humdata.org/api/3/action/package_show"
+  huggingface_url: "https://huggingface.co/datasets/electricsheepafrica/africa-wfp-food-prices-for-benin/resolve/main/wfp_food_prices_ben.csv"
+  fallback_local_path: "data/train.parquet"
+  timeout_seconds: 30
+
+validation:
+  min_rows: 10000
+  required_columns:
+    - "date"
+    - "market"
+    - "commodity"
+    - "unit"
+    - "price"
+  critical_commodities:
+    - "Maize (white)"
+    - "Rice (imported)"
+    - "Beans (white)"
+    - "Cassava meal (gari)"
+    - "Tomatoes"
+    - "Oil (groundnut)"
+    - "Onions"
+
+retraining:
+  holdout_months: 6
+  algorithms:
+    - "random_forest"
+    - "lightgbm"
+  horizons:
+    - 1
+    - 2
+    - 3
+  decision_rule:
+    # Règle de décision : le candidat doit réduire la MAE globale sur le holdout
+    # sans provoquer de dégradation majeure (> 15 %) sur un produit phare
+    max_global_mae_ratio: 1.0 # candidat_mae <= current_mae * 1.0
+    max_product_degradation_pct: 15.0
+

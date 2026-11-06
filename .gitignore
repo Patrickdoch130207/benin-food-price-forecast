@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Retraining and simulation
+models_candidate/
+models_simulation/
+data/raw/*.csv
+
