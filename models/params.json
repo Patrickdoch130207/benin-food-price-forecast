@@ -1,0 +1,63 @@
+{
+  "random_forest": {
+    "h1": {
+      "criterion": "absolute_error",
+      "n_estimators": 150,
+      "max_depth": 7,
+      "min_samples_leaf": 12,
+      "max_features": 0.7,
+      "shrinkage": 0.65
+    },
+    "h2": {
+      "criterion": "absolute_error",
+      "n_estimators": 150,
+      "max_depth": 8,
+      "min_samples_leaf": 8,
+      "max_features": 0.7,
+      "shrinkage": 0.6
+    },
+    "h3": {
+      "criterion": "absolute_error",
+      "n_estimators": 150,
+      "max_depth": 8,
+      "min_samples_leaf": 8,
+      "max_features": 0.7,
+      "shrinkage": 0.6
+    }
+  },
+  "lightgbm": {
+    "h1": {
+      "objective": "mae",
+      "n_estimators": 150,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "num_leaves": 15,
+      "min_child_samples": 25,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "shrinkage": 0.75
+    },
+    "h2": {
+      "objective": "mae",
+      "n_estimators": 150,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "num_leaves": 15,
+      "min_child_samples": 25,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "shrinkage": 0.75
+    },
+    "h3": {
+      "objective": "mae",
+      "n_estimators": 150,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "num_leaves": 15,
+      "min_child_samples": 25,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "shrinkage": 0.75
+    }
+  }
+}

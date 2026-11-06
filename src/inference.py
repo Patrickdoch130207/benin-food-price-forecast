@@ -213,12 +213,25 @@ def build_inference_row(
     month_sin = float(np.sin(2 * np.pi * month / 12.0))
     month_cos = float(np.cos(2 * np.pi * month / 12.0))
 
-    sub_nat = df_prices[
-        (df_prices["commodity"] == commodity) &
-        (df_prices["date"] == last_row["date"])
-    ]["price"].dropna()
-    nat_median_lag1 = float(sub_nat.median()) if not sub_nat.empty else lag_1
+    sub_nat_df = df_prices[df_prices["commodity"] == commodity]
+    nat_by_month = sub_nat_df.groupby(sub_nat_df["date"].dt.to_period("M"))["price"].median().sort_index()
+    nat_median_lag1 = float(nat_by_month.iloc[-1]) if len(nat_by_month) >= 1 else lag_1
+    if len(nat_by_month) >= 2 and nat_by_month.iloc[-2] != 0:
+        var_nat_m1 = float(((nat_by_month.iloc[-1] - nat_by_month.iloc[-2]) / nat_by_month.iloc[-2]) * 100.0)
+    else:
+        var_nat_m1 = 0.0
+
+    # Calcul de ecart_marche (moyenne historique des rapports prix_local / med_nat)
+    if not sub_series.empty and len(nat_by_month) > 0:
+        s_months = sub_series["date"].dt.to_period("M")
+        s_nat = s_months.map(nat_by_month)
+        valid_ratios = (sub_series["price"] / s_nat).replace([np.inf, -np.inf], np.nan).dropna()
+        ecart_marche = float(valid_ratios.mean()) if len(valid_ratios) >= 1 else (float(lag_1 / nat_median_lag1) if nat_median_lag1 != 0 else 1.0)
+    else:
+        ecart_marche = float(lag_1 / nat_median_lag1) if nat_median_lag1 != 0 else 1.0
+
     ratio_local_nat_lag1 = float(lag_1 / nat_median_lag1) if nat_median_lag1 != 0 else 1.0
+    nord_flag = 1 if str(admin1) in DEPARTEMENTS_NORD else 0
 
     row_dict = {
         "commodity": commodity,
@@ -229,6 +242,17 @@ def build_inference_row(
         "unit": unit,
         "latitude": lat,
         "longitude": lon,
+        # 10 features unifiées de src/features.py (03_features.ipynb)
+        "prix_m1": lag_1,
+        "prix_m12": lag_12,
+        "prix_dernier_connu": lag_1,
+        "anciennete_dernier_prix": 1.0,
+        "med_nat_m1": nat_median_lag1,
+        "var_nat_m1": var_nat_m1,
+        "ecart_marche": ecart_marche,
+        "mois_annee": month,
+        "nord": nord_flag,
+        # Compatibilité descendante
         "lag_1": lag_1,
         "lag_2": lag_2,
         "lag_3": lag_3,

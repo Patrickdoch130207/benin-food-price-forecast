@@ -1,81 +1,115 @@
 {
   "version": "1.0.0",
   "date_entrainement": "2026-11-06",
-  "donnees_jusqu_a": "2024-12",
-  "date_debut_train": "2020-01-15",
-  "date_fin_train": "2024-12-15",
-  "date_debut_test": "2025-01-15",
-  "date_fin_test": "2026-02-15",
-  "modele_final": "random_forest",
+  "donnees_jusqu_a": "2026-02",
+  "date_debut_train": "2020-01-01",
+  "date_fin_train": "2024-12-01",
+  "date_debut_test": "2025-01-01",
+  "date_fin_test": "2026-02-01",
+  "modele_final": "lightgbm",
   "choix_par_horizon": {
-    "h1": "random_forest",
+    "h1": "lightgbm",
     "h2": "random_forest",
-    "h3": "random_forest"
+    "h3": "lightgbm"
   },
   "horizons": [
     1,
     2,
     3
   ],
+  "features_retenues": [
+    "commodity",
+    "market",
+    "prix_m1",
+    "prix_m12",
+    "prix_dernier_connu",
+    "anciennete_dernier_prix",
+    "med_nat_m1",
+    "var_nat_m1",
+    "ecart_marche",
+    "mois_annee",
+    "latitude",
+    "nord"
+  ],
   "metriques": {
     "random_forest": {
       "h1": {
-        "MAE": 55.09,
-        "RMSE": 86.61,
-        "MAPE (%)": 11.94,
-        "WAPE (%)": 8.89
+        "MAE": 51.83,
+        "RMSE": 111.78,
+        "MAPE (%)": 10.21,
+        "WAPE (%)": 8.52
       },
       "h2": {
-        "MAE": 75.05,
-        "RMSE": 109.36,
-        "MAPE (%)": 17.03,
-        "WAPE (%)": 12.16
+        "MAE": 73.27,
+        "RMSE": 148.59,
+        "MAPE (%)": 15.07,
+        "WAPE (%)": 12.12
       },
       "h3": {
-        "MAE": 88.88,
-        "RMSE": 121.78,
-        "MAPE (%)": 20.76,
-        "WAPE (%)": 14.54
+        "MAE": 87.53,
+        "RMSE": 170.01,
+        "MAPE (%)": 18.77,
+        "WAPE (%)": 14.62
       }
     },
     "lightgbm": {
       "h1": {
-        "MAE": 61.61,
-        "RMSE": 94.03,
-        "MAPE (%)": 12.6,
-        "WAPE (%)": 9.94
+        "MAE": 51.75,
+        "RMSE": 110.65,
+        "MAPE (%)": 10.1,
+        "WAPE (%)": 8.51
       },
       "h2": {
-        "MAE": 86.39,
-        "RMSE": 123.2,
-        "MAPE (%)": 18.33,
-        "WAPE (%)": 13.99
+        "MAE": 74.58,
+        "RMSE": 150.02,
+        "MAPE (%)": 15.2,
+        "WAPE (%)": 12.33
       },
       "h3": {
-        "MAE": 114.11,
-        "RMSE": 153.47,
-        "MAPE (%)": 23.19,
-        "WAPE (%)": 18.67
+        "MAE": 85.67,
+        "RMSE": 164.15,
+        "MAPE (%)": 18.1,
+        "WAPE (%)": 14.31
       }
     },
     "naif": {
       "h1": {
-        "MAE": 46.39,
-        "RMSE": 93.45,
-        "MAPE (%)": 9.35,
-        "WAPE (%)": 7.49
+        "MAE": 58.32,
+        "RMSE": 123.75,
+        "MAPE (%)": 12.26,
+        "WAPE (%)": 9.59
       },
       "h2": {
-        "MAE": 68.14,
-        "RMSE": 131.3,
-        "MAPE (%)": 14.58,
-        "WAPE (%)": 11.05
+        "MAE": 81.66,
+        "RMSE": 169.9,
+        "MAPE (%)": 17.6,
+        "WAPE (%)": 13.51
       },
       "h3": {
-        "MAE": 84.73,
-        "RMSE": 157.73,
-        "MAPE (%)": 19.37,
-        "WAPE (%)": 13.87
+        "MAE": 98.73,
+        "RMSE": 197.69,
+        "MAPE (%)": 22.66,
+        "WAPE (%)": 16.49
+      }
+    },
+    "naif_saisonnier": {
+      "h1": {
+        "MAE": 144.48,
+        "RMSE": 220.81,
+        "MAPE (%)": 27.4,
+        "WAPE (%)": 23.76
+      },
+      "h2": {
+        "MAE": 148.64,
+        "RMSE": 226.69,
+        "MAPE (%)": 29.58,
+        "WAPE (%)": 24.58
+      },
+      "h3": {
+        "MAE": 153.06,
+        "RMSE": 234.32,
+        "MAPE (%)": 32.61,
+        "WAPE (%)": 25.57
       }
     },
     "sarima": {
@@ -91,20 +125,44 @@
         "Huile d'arachide": 147.4,
         "Oignon": 282.0
       }
+    }
+  },
+  "metriques_par_produit": {
+    "naif": {
+      "Gari": 31.94,
+      "Riz importé": 26.08,
+      "Maïs blanc": 14.58,
+      "Haricot blanc": 44.72,
+      "Tomate": 122.25,
+      "Huile d'arachide": 52.79,
+      "Oignon": 106.69
     },
     "naif_saisonnier": {
-      "h1": {
-        "MAE": 147.19
-      },
-      "par_produit": {
-        "Maïs blanc": 84.1,
-        "Riz importé": 55.0,
-        "Haricot blanc": 155.8,
-        "Gari": 83.3,
-        "Tomate": 177.4,
-        "Huile d'arachide": 239.7,
-        "Oignon": 235.0
-      }
+      "Gari": 79.82,
+      "Riz importé": 87.74,
+      "Maïs blanc": 62.76,
+      "Haricot blanc": 161.52,
+      "Tomate": 164.5,
+      "Huile d'arachide": 257.33,
+      "Oignon": 183.39
+    },
+    "random_forest": {
+      "Gari": 25.54,
+      "Riz importé": 22.42,
+      "Maïs blanc": 13.82,
+      "Haricot blanc": 40.59,
+      "Tomate": 108.86,
+      "Huile d'arachide": 49.49,
+      "Oignon": 94.2
+    },
+    "lightgbm": {
+      "Gari": 25.55,
+      "Riz importé": 23.32,
+      "Maïs blanc": 13.51,
+      "Haricot blanc": 40.4,
+      "Tomate": 107.95,
+      "Huile d'arachide": 50.33,
+      "Oignon": 93.31
     }
   },
   "unites": [
@@ -120,8 +178,9 @@
     "lightgbm_h3.joblib"
   ],
   "notes": [
-    "Modèles entraînés sans fuite sur les données antérieures à 2025.",
-    "Évaluation finale réalisée sur la période scellée 2025–2026.",
-    "Pipeline complet autonome comprenant imputation et encodage ordinal pour l'API."
+    "Prétraitement unifié (01_cleaning.ipynb) : 21 394 relevés Retail, 313 séries, 50 marchés, 7 produits phares (2019-2026).",
+    "Feature Engineering unifié (03_features.ipynb & src/features.py) : 10 variables explicatives sans fuite + produit et marché.",
+    "Modélisation en log-variation autour de l'ancre passée (prix_m1 -> prix_dernier_connu -> med_nat_m1 * ecart_marche) avec perte L1 (MAE).",
+    "Entraînement sur 2020-2024 (60 mois) et évaluation sur la période de test scellée 2025-2026."
   ]
 }

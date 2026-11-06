@@ -91,18 +91,41 @@ def compute_metrics_by_group(
     return pd.DataFrame(rows)
 
 
+def get_naive_predictions(df: pd.DataFrame) -> pd.Series:
+    """Renvoie la prédiction du modèle naïf (prix du mois M-1, repli sur médiane nationale M-1)."""
+    if "prix_m1" in df.columns:
+        pred = df["prix_m1"].copy()
+        if "med_nat_m1" in df.columns:
+            pred = pred.fillna(df["med_nat_m1"])
+        return pred
+    elif "lag_1" in df.columns:
+        return df["lag_1"].copy()
+    raise ValueError("Colonne 'prix_m1' ou 'lag_1' introuvable pour le modèle naïf.")
+
+
+def get_seasonal_naive_predictions(df: pd.DataFrame) -> pd.Series:
+    """Renvoie la prédiction du modèle naïf saisonnier (prix du mois M-12, repli sur médiane nationale M-1)."""
+    if "prix_m12" in df.columns:
+        pred = df["prix_m12"].copy()
+        if "med_nat_m1" in df.columns:
+            pred = pred.fillna(df["med_nat_m1"])
+        return pred
+    elif "lag_12" in df.columns:
+        return df["lag_12"].copy()
+    raise ValueError("Colonne 'prix_m12' ou 'lag_12' introuvable pour le modèle naïf saisonnier.")
+
+
 def evaluate_baseline_naive(df: pd.DataFrame, horizon: int = 1) -> Dict[str, float]:
-    """Évalue la baseline naïve de persistance pour un horizon donné.
-
-    Pour H1, le modèle naïf prédit le prix à t-1 (lag_1).
-    Pour H2, à l'horizon 2 mois, la dernière information connue au moment de la prédiction est lag_1 (ou lag_2 selon l'origine).
-    """
-    target_col = f"target_{horizon}m"
-    if target_col not in df.columns:
-        raise ValueError(f"Cible {target_col} absente du DataFrame.")
-
-    # La prédiction naïve standard est le dernier prix connu (lag_1)
+    """Évalue la baseline naïve de persistance (prix M-1) pour un horizon donné."""
+    target_col = f"target_{horizon}m" if f"target_{horizon}m" in df.columns else "prix"
     y_true = df[target_col]
-    y_naive = df["lag_1"]
-
+    y_naive = get_naive_predictions(df)
     return compute_metrics(y_true, y_naive)
+
+
+def evaluate_baseline_seasonal_naive(df: pd.DataFrame, horizon: int = 1) -> Dict[str, float]:
+    """Évalue la baseline naïve saisonnière (prix M-12) pour un horizon donné."""
+    target_col = f"target_{horizon}m" if f"target_{horizon}m" in df.columns else "prix"
+    y_true = df[target_col]
+    y_snaive = get_seasonal_naive_predictions(df)
+    return compute_metrics(y_true, y_snaive)

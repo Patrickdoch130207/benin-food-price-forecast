@@ -151,3 +151,86 @@ def verifier_sans_fuite(prix, feats, mois_test=("2021-06", "2023-03", "2025-01")
         diff = ~((a == b) | (a.isna() & b.isna())).all()
         resultats[str(m)] = int(diff.sum())
     return resultats
+
+
+def prepare_data(df_brut: pd.DataFrame) -> pd.DataFrame:
+    """Nettoie le jeu de données brut selon les règles exactes de 01_cleaning.ipynb.
+
+    Étapes :
+    1. Filtrage sur les prix de détail (pricetype == 'Retail') et retrait des colonnes constantes.
+    2. Restriction à la période dense (>= 2019-01-01).
+    3. Sélection des 7 produits phares et des séries ayant au moins 48 relevés et actives >= 2025-01-01.
+    4. Suppression des prix aberrants identifiés (Tomate à Tatonnoukon, Gari > 1000 à Azovè, Maïs à Dangbo 2020-03-15).
+    """
+    df = df_brut.copy()
+    if "pricetype" in df.columns:
+        df = df[df["pricetype"] == "Retail"].copy()
+
+    cols_inutiles = [c for c in ["pricetype", "priceflag", "currency", "esa_source", "esa_processed"] if c in df.columns]
+    if cols_inutiles:
+        df = df.drop(columns=cols_inutiles)
+
+    df["date"] = pd.to_datetime(df["date"])
+    df = df[df["date"] >= "2019-01-01"].copy()
+
+    series = df.groupby(["commodity", "market"])["date"].agg(["count", "min", "max"])
+    bonnes = series[(series["count"] >= 48) & (series["max"] >= "2025-01-01")]
+    phares = list(NOMS_PRODUITS.keys())
+    bonnes_phares = bonnes[bonnes.index.get_level_values("commodity").isin(phares)].index
+
+    df = df.set_index(["commodity", "market"])
+    df = df[df.index.isin(bonnes_phares)].reset_index()
+
+    # Retrait des anomalies documentées en partie 4 de 01_cleaning.ipynb
+    df = df[~((df["commodity"] == "Tomatoes") & (df["market"] == "Tatonnoukon"))]
+    df = df[~((df["commodity"] == "Cassava meal (gari)") & (df["market"] == "Azovè") & (df["price"] > 1000))]
+    df = df[~((df["commodity"] == "Maize (white)") & (df["market"] == "Dangbo") & (df["date"] == "2020-03-15"))]
+
+    return df.sort_values(["commodity", "market", "date"]).reset_index(drop=True)
+
+
+def prepare_food_price_features(
+    prix_path: str = "data/prix_propres.parquet",
+    features_path: str = "data/features.parquet",
+    df_propre: pd.DataFrame = None
+) -> pd.DataFrame:
+    """Construit la table unifiée des features (03_features.ipynb) et ajoute les cibles H1, H2, H3 sans fuite.
+
+    À la ligne du mois M (dont toutes les features sont connues à M-1) :
+    - target_1m : prix au mois M (horizon 1 mois depuis M-1)
+    - target_2m : prix au mois M+1 (horizon 2 mois depuis M-1)
+    - target_3m : prix au mois M+2 (horizon 3 mois depuis M-1)
+    """
+    from pathlib import Path
+
+    if df_propre is None:
+        p = Path(prix_path)
+        if not p.exists():
+            p = Path("benin-food-price-forecast") / prix_path
+        df_propre = pd.read_parquet(p)
+
+    feats = construire_features(df_propre)
+
+    # Sauvegarde au format exact attendu par 03_features.ipynb
+    if features_path:
+        out_p = Path(features_path)
+        if not out_p.parent.exists() and (Path("benin-food-price-forecast") / features_path).parent.exists():
+            out_p = Path("benin-food-price-forecast") / features_path
+        feats.assign(mois=feats["mois"].astype(str)).to_parquet(out_p, index=False)
+
+    # Ajout des cibles multi-horizons (H1 = M, H2 = M+1, H3 = M+2)
+    grille = feats[["commodity", "market", "mois", "prix"]].copy()
+    feats["target_1m"] = feats["prix"]
+    for h in [2, 3]:
+        decale = grille.copy()
+        decale["mois"] = decale["mois"] - (h - 1)
+        decale = decale.rename(columns={"prix": f"target_{h}m"})
+        feats = feats.merge(decale, on=["commodity", "market", "mois"], how="left")
+
+    # Ajout de l'unité par produit pour les métadonnées
+    if "unit" in df_propre.columns:
+        unites_map = df_propre.drop_duplicates("commodity").set_index("commodity")["unit"]
+        feats["unit"] = feats["commodity"].map(unites_map)
+
+    return feats
+
