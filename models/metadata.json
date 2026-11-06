@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "date_entrainement": "2026-11-06",
+  "donnees_jusqu_a": "2024-12",
+  "date_debut_train": "2020-01-15",
+  "date_fin_train": "2024-12-15",
+  "date_debut_test": "2025-01-15",
+  "date_fin_test": "2026-02-15",
+  "modele_final": "random_forest",
+  "choix_par_horizon": {
+    "h1": "random_forest",
+    "h2": "random_forest",
+    "h3": "random_forest"
+  },
+  "horizons": [
+    1,
+    2,
+    3
+  ],
+  "metriques": {
+    "random_forest": {
+      "h1": {
+        "MAE": 55.09,
+        "RMSE": 86.61,
+        "MAPE (%)": 11.94,
+        "WAPE (%)": 8.89
+      },
+      "h2": {
+        "MAE": 75.05,
+        "RMSE": 109.36,
+        "MAPE (%)": 17.03,
+        "WAPE (%)": 12.16
+      },
+      "h3": {
+        "MAE": 88.88,
+        "RMSE": 121.78,
+        "MAPE (%)": 20.76,
+        "WAPE (%)": 14.54
+      }
+    },
+    "lightgbm": {
+      "h1": {
+        "MAE": 61.61,
+        "RMSE": 94.03,
+        "MAPE (%)": 12.6,
+        "WAPE (%)": 9.94
+      },
+      "h2": {
+        "MAE": 86.39,
+        "RMSE": 123.2,
+        "MAPE (%)": 18.33,
+        "WAPE (%)": 13.99
+      },
+      "h3": {
+        "MAE": 114.11,
+        "RMSE": 153.47,
+        "MAPE (%)": 23.19,
+        "WAPE (%)": 18.67
+      }
+    },
+    "naif": {
+      "h1": {
+        "MAE": 46.39,
+        "RMSE": 93.45,
+        "MAPE (%)": 9.35,
+        "WAPE (%)": 7.49
+      },
+      "h2": {
+        "MAE": 68.14,
+        "RMSE": 131.3,
+        "MAPE (%)": 14.58,
+        "WAPE (%)": 11.05
+      },
+      "h3": {
+        "MAE": 84.73,
+        "RMSE": 157.73,
+        "MAPE (%)": 19.37,
+        "WAPE (%)": 13.87
+      }
+    }
+  },
+  "unites": [
+    "KG",
+    "L"
+  ],
+  "fichiers_modeles_exportes": [
+    "random_forest_h1.joblib",
+    "lightgbm_h1.joblib",
+    "random_forest_h2.joblib",
+    "lightgbm_h2.joblib",
+    "random_forest_h3.joblib",
+    "lightgbm_h3.joblib"
+  ],
+  "notes": [
+    "Modèles entraînés sans fuite sur les données antérieures à 2025.",
+    "Évaluation finale réalisée sur la période scellée 2025–2026.",
+    "Pipeline complet autonome comprenant imputation et encodage ordinal pour l'API."
+  ]
+}
