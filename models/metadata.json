@@ -77,6 +77,34 @@
         "MAPE (%)": 19.37,
         "WAPE (%)": 13.87
       }
+    },
+    "sarima": {
+      "h1": {
+        "MAE": 119.77
+      },
+      "par_produit": {
+        "Maïs blanc": 54.0,
+        "Riz importé": 39.8,
+        "Haricot blanc": 114.8,
+        "Gari": 46.9,
+        "Tomate": 153.5,
+        "Huile d'arachide": 147.4,
+        "Oignon": 282.0
+      }
+    },
+    "naif_saisonnier": {
+      "h1": {
+        "MAE": 147.19
+      },
+      "par_produit": {
+        "Maïs blanc": 84.1,
+        "Riz importé": 55.0,
+        "Haricot blanc": 155.8,
+        "Gari": 83.3,
+        "Tomate": 177.4,
+        "Huile d'arachide": 239.7,
+        "Oignon": 235.0
+      }
     }
   },
   "unites": [

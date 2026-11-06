@@ -258,10 +258,10 @@ elif page_choice == "🔮 Prévision des prix":
     horizon_choice = st.sidebar.selectbox("Horizon de prévision", ["1 mois", "2 mois", "3 mois"], index=0)
     horizon_num = int(horizon_choice.split()[0])
 
-    # 4. Choix du modèle
+    # 4. Choix du modèle (Machine Learning & Baselines de référence)
     model_choice = st.sidebar.selectbox(
         "Modèle",
-        ["Modèle final (recommandé)", "Random Forest", "LightGBM", "Naïf"],
+        ["Modèle final (recommandé)", "Random Forest", "LightGBM", "SARIMA", "Naïf", "Naïf saisonnier"],
         index=0
     )
 
@@ -478,7 +478,11 @@ else:
         sel_horizon_str = st.selectbox("Horizon prévisionnel", ["1 mois", "2 mois", "3 mois"], index=0)
         sel_horizon = int(sel_horizon_str.split()[0])
     with c3:
-        sel_model = st.selectbox("Modèle d'estimation", ["Modèle final (recommandé)", "Random Forest", "LightGBM", "Naïf"], index=0)
+        sel_model = st.selectbox(
+            "Modèle d'estimation",
+            ["Modèle final (recommandé)", "Random Forest", "LightGBM", "SARIMA", "Naïf", "Naïf saisonnier"],
+            index=0
+        )
 
     # Barre de recherche / filtre Regex
     regex_input = st.text_input(
